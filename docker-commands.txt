@@ -1,0 +1,4 @@
+docker build -t oanda_neat .         # to build image
+
+docker run oanda_neat
+
