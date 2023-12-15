@@ -3,15 +3,12 @@ import os.path
 import time
 from time import sleep
 from datetime import datetime, timedelta
-
 import math
 import random
 from random import random, randint
-
 import multiprocessing
 from multiprocessing import Process, Queue, Manager
 from multiprocessing.queues import Empty 
-
 import logging
 import pandas as pd
 import numpy as np
