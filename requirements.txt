@@ -1,6 +1,7 @@
+requests==2.26.0
 neat-python
-visualize
-plotly
-wget
-graphviz
-pandas
+matplotlib==3.6.2
+plotly==5.8.0
+wget==3.2
+graphviz==0.20.1
+pandas==2.1.4
