@@ -26,8 +26,7 @@ import wget
 import requests
 import json
 import config.acct_config
-# # instrument, n, initial_balance, volume, spread
-import config.experiment_config
+
 from config.experiment_config import *
 
 # Configure logging at the script level
@@ -329,20 +328,21 @@ def run_main_process(queue, population):
     rewards_lst = []
     while True:
         try:
-            data = queue.get(timeout=1)  # Wait for 1 second for new data
-            if data is not None:
-                rewards_lst.append(data)
+            msg = queue.get(timeout=1)  # Wait for 1 second for new data
+            if msg is not None:
+                rewards_lst.append(msg)
             else:
                 print('run_main_process() received None')
         except Exception as e:
             print(f"An exception occurred: {e, str(e)}")
-            print('data=',data)
+            print('reward msg=',msg)
             break  # Break the loop on any exception
 
     print('run_main_process(): Done', flush=True)
-    
     print('rewards list queue: ', rewards_lst)
-
+    # Put rewards_lst back into the queue to send it to the main process
+    queue.put(rewards_lst)
+    return rewards_lst
 
 
 def set_start_method():
@@ -373,30 +373,35 @@ def eval_gemones_multi(genomes, config):
         p = Process(target=evaluate_genome, args=(queue, data_tuple, local_simulation_vars))
         processes.append(p)
         p.start()
-
-    # Check if the lengths of both lists are equal
-    if len(genomes) == len(results):
-        # Create a new list to store genomes with fitness
-        genomes_with_fitness = []
-
-        # Iterate through each pair of genome and result using zip
-        for (genome_id, genome_data), result in zip(genomes, results):
-
-            # ASSIGN GENOME FITNESS
-            genome_data.fitness = result
-            
-    else:
-        print("Genomes and results lists have different lengths.")
-    print('results: ', results)
     
     main_process = Process(target=run_main_process, args=(queue, population))
     main_process.start()
     queue.put(None)
-    main_process.join()
+    # Wait for the main_process to finish and capture its return value
+    results = main_process.join()  # This will get the return value from run_main_process
+    if(not results):
+        print('not results')
+    else:
+        # Check if the lengths of both lists are equal
+        if len(genomes) == len(results):
+            # Create a new list to store genomes with fitness
+            genomes_with_fitness = []
+
+            # Iterate through each pair of genome and result using zip
+            for (genome_id, genome_data), result in zip(genomes, results):
+
+                # ASSIGN GENOME FITNESS
+                genome_data.fitness = result
+                
+        else:
+            print("Genomes and results lists have different lengths.")
+        print('results: ', results)
+
+
 
 
 # Code for evaluating a single genome
-def evaluate_genome(queue, data_tuple, simulation_vars): # input_tuple: (neat_df, network)
+def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (neat_df, network)
     neat_df_cp, network = data_tuple
     
     data = neat_df_cp.copy()
@@ -413,25 +418,25 @@ def evaluate_genome(queue, data_tuple, simulation_vars): # input_tuple: (neat_df
     logger.addHandler(ch)
     
     
-    def myget_pl(simulation_vars):
-        denominator = 10 ** float(simulation_vars['pip_location'])
-        pl_pips = (simulation_vars['current_price'] - simulation_vars['open_price']) / denominator
+    def myget_pl(local_simulation_vars):
+        denominator = 10 ** float(local_simulation_vars['pip_location'])
+        pl_pips = (local_simulation_vars['current_price'] - local_simulation_vars['open_price']) / denominator
         return pl_pips
 
-    def get_next_observation(simulation_vars):
+    def get_next_observation(local_simulation_vars):
         #simulation_vars['current_step'] = already incremented in mystep()
-        if ((simulation_vars['current_step'] < len(data)) and (simulation_vars['done']==False)):
+        if ((local_simulation_vars['current_step'] < len(data)) and (local_simulation_vars['done']==False)):
             #print('hello get_next_observation()')
-            current_unrealized = myget_pl(simulation_vars)
+            current_unrealized = myget_pl(local_simulation_vars)
             #print('current_unrealized:', current_unrealized)
-            current_holding = simulation_vars['direction']
-            #print('current_step:', simulation_vars['current_step'])
-            observation = data.iloc[simulation_vars['current_step']][['pips_delta', 'tl_slope']].values 
+            current_holding = local_simulation_vars['direction']
+            #print('current_step:', local_simulation_vars['current_step'])
+            observation = data.iloc[local_simulation_vars['current_step']][['pips_delta', 'tl_slope']].values 
             observation = np.append(observation, [current_unrealized, current_holding])
             #print('observation: ;-)', observation)
             #observation = deNaN(observation)
         else:
-            simulation_vars['done'] = True
+            local_simulation_vars['done'] = True
             observation = deNaN([0.0, 0.0, 0.0, 0])
             print('reached end of data, last/nan obs sent: ', observation)
         return observation
@@ -446,134 +451,149 @@ def evaluate_genome(queue, data_tuple, simulation_vars): # input_tuple: (neat_df
         #print('action:::', action)
         return action
 
-    def mystep(simulation_vars):
+    def mystep(local_simulation_vars):
         #logging.info('hello step(), input action = %s', action)
-        from config.experiment_config import volume
 
-        def myposition_reset(simulation_vars):
-                simulation_vars['direction'] = 0
-                simulation_vars['volume'] = 0.0
-                simulation_vars['equity_curve'] = [0]
-                simulation_vars['mdd'] = 0.0
-                simulation_vars['p_l'] = 0.0
+        def myposition_reset(local_simulation_vars):
+                local_simulation_vars['direction'] = 0
+                local_simulation_vars['volume'] = 0.0
+                local_simulation_vars['equity_curve'] = [0]
+                local_simulation_vars['mdd'] = 0.0
+                local_simulation_vars['p_l'] = 0.0
 
-        def myget_position_json(simulation_vars):
+        def myget_position_json(local_simulation_vars):
+            
+            # Check and handle NaT or None for open_time
+            if pd.isnull(local_simulation_vars['open_time']):
+                open_time_str = pd.Timestamp(0).strftime('%Y-%m-%d %H:%M:%S')  # Beginning of the epoch
+            else:
+                open_time_str = local_simulation_vars['open_time'].strftime('%Y-%m-%d %H:%M:%S')
+
+            # Check and handle NaT or None for close_time
+            if pd.isnull(local_simulation_vars['close_time']):
+                close_time_str = pd.Timestamp(0).strftime('%Y-%m-%d %H:%M:%S')  # Beginning of the epoch
+            else:
+                close_time_str = local_simulation_vars['close_time'].strftime('%Y-%m-%d %H:%M:%S')
+
             position_data = {
-                'direction': simulation_vars['direction'],
-                'volume': simulation_vars['volume'],
-                'open_price': simulation_vars['open_price'],
-                'close_price': simulation_vars['close_price'],
-                'p_l': simulation_vars['p_l'],
-                'open_time': simulation_vars['open_time'].strftime('%Y-%m-%d %H:%M:%S'),  # Convert to string
-                'close_time': simulation_vars['close_time'].strftime('%Y-%m-%d %H:%M:%S'),  # Convert to string
-                'duration': str(simulation_vars['duration']),  # Convert to string
-                'above_water_fraction': str(simulation_vars['above_water_fraction'])
+                'direction': local_simulation_vars['direction'],
+                'volume': local_simulation_vars['volume'],
+                'open_price': local_simulation_vars['open_price'],
+                'close_price': local_simulation_vars['close_price'],
+                'p_l': local_simulation_vars['p_l'],
+                'open_time': open_time_str, #local_simulation_vars['open_time'].strftime('%Y-%m-%d %H:%M:%S'),  # Convert to string
+                'close_time': close_time_str, #local_simulation_vars['close_time'].strftime('%Y-%m-%d %H:%M:%S'),  # Convert to string
+                'duration': str(local_simulation_vars['duration']),  # Convert to string
+                'above_water_fraction': str(local_simulation_vars['above_water_fraction'])
             }
             jsn = json.dumps(position_data)
             print('myget_position_json(): ', jsn)
             return jsn
 
-        def myclose_position(simulation_vars):
-                close_time = simulation_vars['current_timestamp']
-                close_price = simulation_vars['current_price']
-                #print('open_time at close = ', simulation_vars['open_time'])
+        def myclose_position(local_simulation_vars):
+                close_time = local_simulation_vars['current_timestamp']
+                close_price = local_simulation_vars['current_price']
+                #print('open_time at close = ', local_simulation_vars['open_time'])
 
                 # update pos.
-                print('vol1, dir == ', simulation_vars['volume'], ', ', simulation_vars['current_step'], flush=True)
-                myupdate(simulation_vars)
-                print('vol4, dir == ', simulation_vars['volume'], ', ', simulation_vars['current_step'], flush=True)
-                jsn = myget_position_json(simulation_vars)
+                print('vol1, dir == ', local_simulation_vars['volume'], ', ', local_simulation_vars['current_step'], flush=True)
+                myupdate(local_simulation_vars)
+                print('vol4, dir == ', local_simulation_vars['volume'], ', ', local_simulation_vars['current_step'], flush=True)
+                jsn = myget_position_json(local_simulation_vars)
                 myposition_reset()
                 return jsn
 
-        def myopen_position(simulation_vars):
-            if simulation_vars['volume'] == 0:
+        def myopen_position(order_type_str, local_simulation_vars):
+            if local_simulation_vars['volume'] == 0:
                     # position object
-                    #simulation_vars['current_price'] = current_price
-                    print('myopen_position() current_timestamp: ', simulation_vars['current_timestamp'])
-                    simulation_vars['open_time'] = simulation_vars['current_timestamp']
-                    simulation_vars['open_price'] = simulation_vars['current_price']
-                    simulation_vars['volume'] = config.experiment_config.volume
+                    #local_simulation_vars['current_price'] = current_price
+                    print('myopen_position() current_timestamp: ', local_simulation_vars['current_timestamp'])
+                    local_simulation_vars['open_time'] = local_simulation_vars['current_timestamp']
+                    local_simulation_vars['open_price'] = local_simulation_vars['current_price']
+                    local_simulation_vars['volume'] = 100 if order_type_str=='Buy' else (-100 if order_type_str=='Sell' else 0)
 
-        def myupdate(simulation_vars):
-            #set direction by volume
-            print('vol2, dir == ', simulation_vars['volume'], ', ', simulation_vars['direction'], flush=True)
-            simulation_vars['direction'] = 1 if simulation_vars['volume']>0 else (-1 if simulation_vars['volume']<0 else 0)
-            print('vol3, dir == ', simulation_vars['volume'], ', ', simulation_vars['direction'], flush=True)
-            # skip update if no position, i.e. volume is zero
-            if(simulation_vars['volume']==0):
-                print('volume equals zero')
-                #return
+        def myupdate(local_simulation_vars):
+            # Initialize lwm with a default value
+            lwm = None
+
+            # set direction by volume
+            local_simulation_vars['direction'] = 1 if local_simulation_vars['volume'] > 0 else (-1 if local_simulation_vars['volume'] < 0 else 0)
             
-            #print('myupdate(); volume, direction:',simulation_vars['volume'],', ',direction)
-            #current_price = current_price simulation_vars['current_price'] ?
-            den = simulation_vars['total_ticks'] if simulation_vars['total_ticks']>0 else 1
-            simulation_vars['underwater_fraction'] = simulation_vars['ticks_underwater'] / den
-            simulation_vars['p_l'] = myget_pl(simulation_vars)
-            duration = simulation_vars['current_timestamp'] - simulation_vars['open_time']
+            # skip update if no position, i.e. volume is zero
+            if local_simulation_vars['volume'] == 0:
+                print('volume equals zero')
+                # return
+            
+            den = local_simulation_vars['total_ticks'] if local_simulation_vars['total_ticks'] > 0 else 1
+            local_simulation_vars['underwater_fraction'] = local_simulation_vars['ticks_underwater'] / den
+            local_simulation_vars['p_l'] = myget_pl(local_simulation_vars)
+            duration = local_simulation_vars['current_timestamp'] - local_simulation_vars['open_time']
+
             # update ticks underwater
-            if simulation_vars['p_l'] < 0:
-                simulation_vars['ticks_underwater'] += 1
+            if local_simulation_vars['p_l'] < 0:
+                local_simulation_vars['ticks_underwater'] += 1
+            
             # update ticks abovewater
-            if simulation_vars['p_l'] > 0:
-                simulation_vars['ticks_abovewater'] += 1
+            if local_simulation_vars['p_l'] > 0:
+                local_simulation_vars['ticks_abovewater'] += 1
 
             # update total ticks
-            simulation_vars['total_ticks'] += 1
+            local_simulation_vars['total_ticks'] += 1
 
             # underwater_fraction
-            simulation_vars['underwater_fraction'] = simulation_vars['ticks_underwater'] / simulation_vars['total_ticks']
+            local_simulation_vars['underwater_fraction'] = local_simulation_vars['ticks_underwater'] / local_simulation_vars['total_ticks']
 
             # above_water_fraction
-            den = simulation_vars['total_ticks'] if simulation_vars['total_ticks']>0 else 1
-            simulation_vars['above_water_fraction'] = simulation_vars['ticks_abovewater'] / den
+            den = local_simulation_vars['total_ticks'] if local_simulation_vars['total_ticks'] > 0 else 1
+            local_simulation_vars['above_water_fraction'] = local_simulation_vars['ticks_abovewater'] / den
 
             # hwm
-            if simulation_vars['p_l'] > simulation_vars['hwm']:
-                simulation_vars['hwm'] = simulation_vars['p_l']
+            if local_simulation_vars['p_l'] > local_simulation_vars['hwm']:
+                local_simulation_vars['hwm'] = local_simulation_vars['p_l']
 
             # append to equity curve
-            simulation_vars['equity_curve'].append(simulation_vars['equity_curve'][-1] + simulation_vars['p_l'])
+            local_simulation_vars['equity_curve'].append(local_simulation_vars['equity_curve'][-1] + local_simulation_vars['p_l'])
 
             # drawdown
-            #drawdown = self.hwm - self.p_l
-            drawdown = calculate_drawdown(simulation_vars['equity_curve'])
-            if drawdown < simulation_vars['mdd']: # assumes dd is negative, need to check it
-                simulation_vars['mdd'] = drawdown
+            # drawdown = self.hwm - self.p_l
+            drawdown = calculate_drawdown(local_simulation_vars)
+            if drawdown < local_simulation_vars['mdd']:  # assumes dd is negative, need to check it
+                local_simulation_vars['mdd'] = drawdown
 
             # lwm
-            if lwm is None or simulation_vars['p_l'] < lwm:
-                lwm = simulation_vars['p_l']
+            if lwm is None or local_simulation_vars['p_l'] < lwm:
+                lwm = local_simulation_vars['p_l']
 
             # update metrics
-            if(simulation_vars['underwater_fraction'] ==0): #need to reexamine
-                simulation_vars['underwater_fraction'] = 1
-            simulation_vars['profit_over_underwater_fraction'] = simulation_vars['p_l'] / simulation_vars['underwater_fraction']
-            simulation_vars['profit_over_mdd'] = simulation_vars['p_l'] / simulation_vars['mdd']
-            simulation_vars['profit_over_underwater_fraction_and_mdd'] = simulation_vars['profit_over_underwater_fraction'] / simulation_vars['mdd']
+            if local_simulation_vars['underwater_fraction'] == 0:  # need to reexamine
+                local_simulation_vars['underwater_fraction'] = 1
+            local_simulation_vars['profit_over_underwater_fraction'] = local_simulation_vars['p_l'] / local_simulation_vars['underwater_fraction']
+            local_simulation_vars['profit_over_mdd'] = local_simulation_vars['p_l'] / local_simulation_vars['mdd']
+            local_simulation_vars['profit_over_underwater_fraction_and_mdd'] = local_simulation_vars['profit_over_underwater_fraction'] / local_simulation_vars['mdd']
         # end myupdate()
+
 
         def reward_function8(pips_earned, above_water_fraction):
             # Use root logger to check if the configuration is affecting the method
             #logging.info('reward_function8(), executing'+str(type(pips_earned)))
             reward = 0.001
-            risk_adj_reward = pips_earned * float(simulation_vars['above_water_fraction'])
+            risk_adj_reward = pips_earned * float(local_simulation_vars['above_water_fraction'])
             reward += pips_earned # risk_adj_reward
             #print('reward_function8(), reward = ' + str(reward))
             return reward
 
         # update done
-        simulation_vars['done'] = simulation_vars['current_step'] >= len(data)
+        local_simulation_vars['done'] = local_simulation_vars['current_step'] >= len(data)
         
         # if episode NOT done
-        if not simulation_vars['done']:          
-            simulation_vars['current_timestamp'] = data.loc[simulation_vars['current_step'], 'time']
-            #simulation_vars['current_step']
-            #logging.info('current_step %s',simulation_vars['current_step'])
-            simulation_vars['current_price'] = data['bid_c'].iloc[simulation_vars['current_step']]
-            #logging.info('current_price %s',simulation_vars['current_price'])
+        if not local_simulation_vars['done']:          
+            local_simulation_vars['current_timestamp'] = data.loc[local_simulation_vars['current_step'], 'time']
+            #local_simulation_vars['current_step']
+            #logging.info('current_step %s',local_simulation_vars['current_step'])
+            local_simulation_vars['current_price'] = data['bid_c'].iloc[local_simulation_vars['current_step']]
+            #logging.info('current_price %s',local_simulation_vars['current_price'])
             reward = 0.0  
-            observation = get_next_observation(simulation_vars)
+            observation = get_next_observation(local_simulation_vars)
             #print('observation+++:',observation)
             output = network.activate(observation)
             #print('output:::::',output)
@@ -582,27 +602,25 @@ def evaluate_genome(queue, data_tuple, simulation_vars): # input_tuple: (neat_df
             # Execute the selected action (0=buy, 1=sell, 2=close, 3=no action)
             if action == 0:  # Buy
                 # if no position open, go ahead and open simulated long position
-                if simulation_vars['volume'] == 0:
-                    myopen_position(simulation_vars)
+                if local_simulation_vars['volume'] == 0:
+                    myopen_position('Buy',local_simulation_vars)
                     
                 else:
                     # update existing position
-                    myupdate(simulation_vars)
+                    myupdate(local_simulation_vars)
             elif action == 1:  # Sell
                 # if no position open, go ahead and open simulated long position
-                if simulation_vars['volume'] == 0:
-                    simulation_vars['open_price'] = simulation_vars['current_price']
-                    simulation_vars['open_time'] = simulation_vars['current_timestamp']
-                    simulation_vars['volume'] = -1 * config.experiment_config.volume
+                if local_simulation_vars['volume'] == 0:
+                    myopen_position('Sell',local_simulation_vars)
                 else:
                     # update existing position
-                    myupdate(simulation_vars)
+                    myupdate(local_simulation_vars)
             elif action == 2:  # Close
                 #logging.info('action == 2 yippie yay')
                 # if position open, go ahead and close it
-                if simulation_vars['volume'] != 0:
+                if local_simulation_vars['volume'] != 0:
                     # close position
-                    jsn = myclose_position(simulation_vars)
+                    jsn = myclose_position(local_simulation_vars)
                     # append closed position to trades list
                     #logging.info('jsn: %s', jsn)
                     trades_list.append(jsn)
@@ -615,45 +633,46 @@ def evaluate_genome(queue, data_tuple, simulation_vars): # input_tuple: (neat_df
                     #logging.info('on close reward = %s', reward)
                 else:  # no position open
                     pass
-                    logging.info('cannot close, no position open')
+                    #logging.info('cannot close, no position open')
             elif action == 3:  # No action
                 # if position open, update it
-                if simulation_vars['volume'] != 0:
-                    myupdate(simulation_vars)
+                if local_simulation_vars['volume'] != 0:
+                    myupdate(local_simulation_vars)
                 else:  # no position
-                    pass
+                    print('')
             # Update the environment state (current step)
-            simulation_vars['current_step']+=1
-            
-            simulation_vars['done'] = simulation_vars['current_step'] >= len(data)
+            print('b4 incr. local_simulation_vars[current_step]', local_simulation_vars['current_step'])
+            local_simulation_vars['current_step']+=1
+            print('aftr. incr. local_simulation_vars[current_step]', local_simulation_vars['current_step'])
+            local_simulation_vars['done'] = local_simulation_vars['current_step'] >= len(data)
 
             # Additional info (optional)
             info = {
-                'balance': simulation_vars['balance'],
-                'position_pnl': simulation_vars['p_l'],
-                'open_price': simulation_vars['open_price'],
+                'balance': local_simulation_vars['balance'],
+                'position_pnl': local_simulation_vars['p_l'],
+                'open_price': local_simulation_vars['open_price'],
             }
             
             #logging.info('mystep(): %s\n%s\n%s\n%s', observation, reward, done, info)
-            return observation, reward, simulation_vars['done'], info
+            return observation, reward, local_simulation_vars['done'], info
         else:  # If episode is done
             print('trades list:', trades_list)
-            return (0.0,0.0,0.0,0), 0.0, simulation_vars['done'], {}  # Return default values or None when the episode is done
+            return (0.0,0.0,0.0,0), 0.0, local_simulation_vars['done'], {}  # Return default values or None when the episode is done
     # end mystep()
 
 
     # loop over data and simulate trading
     total_reward = 0.0
-    next_observation = get_next_observation(simulation_vars) 
+    next_observation = get_next_observation(local_simulation_vars) 
     #print('first.next_observation: ', next_observation)
     prev_net_idx = -9
-    while not simulation_vars['done']:
+    while not local_simulation_vars['done']:
         #print('next_observation=',next_observation)
         output = network.activate(next_observation)
 
         action = myget_action(output)
         #print('action: ', action)
-        next_observation, reward, simulation_vars['done'], info = mystep(simulation_vars)
+        next_observation, reward, local_simulation_vars['done'], info = mystep(local_simulation_vars)
         total_reward += reward
         
     # add to the queue
@@ -686,7 +705,7 @@ if __name__ == '__main__':
     
     # Define your global variables
     simulation_vars = {
-        'volume': 0.0,
+        'volume': 0,
         'current_step': 0,
         'done': False,
         'balance': initial_balance, # check it is set from config file
@@ -716,7 +735,7 @@ if __name__ == '__main__':
     }
     
     get_and_pickle_instrument_info(API_KEY, ACCOUNT_ID, config.experiment_config.instrument)
-    
+
     simulation_vars['mypiplocation'], neat_df = preprocess_data(simulation_vars)
     
     total_rewards_list = []
