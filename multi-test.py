@@ -505,12 +505,10 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
 
         def myopen_position(order_type_str, local_simulation_vars):
             if local_simulation_vars['volume'] == 0:
-                    # position object
-                    #local_simulation_vars['current_price'] = current_price
-                    print('myopen_position() current_timestamp: ', local_simulation_vars['current_timestamp'])
                     local_simulation_vars['open_time'] = local_simulation_vars['current_timestamp']
                     local_simulation_vars['open_price'] = local_simulation_vars['current_price']
                     local_simulation_vars['volume'] = 100 if order_type_str=='Buy' else (-100 if order_type_str=='Sell' else 0)
+                    print('myopen_position() open_time: ', local_simulation_vars['open_time'])
 
         def myupdate(local_simulation_vars):
             # Initialize lwm with a default value
@@ -641,9 +639,9 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
                 else:  # no position
                     print('')
             # Update the environment state (current step)
-            print('b4 incr. local_simulation_vars[current_step]', local_simulation_vars['current_step'])
+            #print('b4 incr. local_simulation_vars[current_step]', local_simulation_vars['current_step'])
             local_simulation_vars['current_step']+=1
-            print('aftr. incr. local_simulation_vars[current_step]', local_simulation_vars['current_step'])
+            #print('aftr. incr. local_simulation_vars[current_step]', local_simulation_vars['current_step'])
             local_simulation_vars['done'] = local_simulation_vars['current_step'] >= len(data)
 
             # Additional info (optional)
