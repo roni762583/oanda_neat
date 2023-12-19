@@ -333,6 +333,7 @@ def run_main_process(queue, population):
                 rewards_lst.append(msg)
             else:
                 print('run_main_process() received None')
+                break
         except Exception as e:
             print(f"An exception occurred: {e, str(e)}")
             print('reward msg=',msg)
@@ -491,16 +492,17 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
             return jsn
 
         def myclose_position(local_simulation_vars):
-                close_time = local_simulation_vars['current_timestamp']
-                close_price = local_simulation_vars['current_price']
+
                 #print('open_time at close = ', local_simulation_vars['open_time'])
 
                 # update pos.
                 print('vol1, dir == ', local_simulation_vars['volume'], ', ', local_simulation_vars['current_step'], flush=True)
                 myupdate(local_simulation_vars)
+                local_simulation_vars['close_time'] = local_simulation_vars['current_timestamp']
+                local_simulation_vars['close_price'] = local_simulation_vars['current_price']
                 print('vol4, dir == ', local_simulation_vars['volume'], ', ', local_simulation_vars['current_step'], flush=True)
                 jsn = myget_position_json(local_simulation_vars)
-                myposition_reset()
+                myposition_reset(local_simulation_vars)
                 return jsn
 
         def myopen_position(order_type_str, local_simulation_vars):
@@ -508,7 +510,7 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
                     local_simulation_vars['open_time'] = local_simulation_vars['current_timestamp']
                     local_simulation_vars['open_price'] = local_simulation_vars['current_price']
                     local_simulation_vars['volume'] = 100 if order_type_str=='Buy' else (-100 if order_type_str=='Sell' else 0)
-                    print('myopen_position() open_time: ', local_simulation_vars['open_time'])
+                    #print('myopen_position() open_time: ', local_simulation_vars['open_time'])
 
         def myupdate(local_simulation_vars):
             # Initialize lwm with a default value
@@ -518,15 +520,15 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
             local_simulation_vars['direction'] = 1 if local_simulation_vars['volume'] > 0 else (-1 if local_simulation_vars['volume'] < 0 else 0)
             
             # skip update if no position, i.e. volume is zero
-            if local_simulation_vars['volume'] == 0:
-                print('volume equals zero')
+            #if local_simulation_vars['volume'] == 0:
+                #print('volume equals zero')
                 # return
             
             den = local_simulation_vars['total_ticks'] if local_simulation_vars['total_ticks'] > 0 else 1
             local_simulation_vars['underwater_fraction'] = local_simulation_vars['ticks_underwater'] / den
             local_simulation_vars['p_l'] = myget_pl(local_simulation_vars)
-            duration = local_simulation_vars['current_timestamp'] - local_simulation_vars['open_time']
-
+            local_simulation_vars['duration'] = local_simulation_vars['current_timestamp'] - local_simulation_vars['open_time']
+            
             # update ticks underwater
             if local_simulation_vars['p_l'] < 0:
                 local_simulation_vars['ticks_underwater'] += 1
@@ -620,7 +622,7 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
                     # close position
                     jsn = myclose_position(local_simulation_vars)
                     # append closed position to trades list
-                    #logging.info('jsn: %s', jsn)
+                    logging.info('close pos. jsn: %s', jsn)
                     trades_list.append(jsn)
                     # Parse the JSON string into a Python object
                     position_json = json.loads(jsn)
@@ -628,7 +630,7 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
                     above_water_fraction = position_json['above_water_fraction']
                     pips_earned = position_json['p_l']
                     reward = reward_function8(pips_earned, above_water_fraction)
-                    #logging.info('on close reward = %s', reward)
+                    logging.info('on close reward = %s', reward)
                 else:  # no position open
                     pass
                     #logging.info('cannot close, no position open')
@@ -637,13 +639,13 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
                 if local_simulation_vars['volume'] != 0:
                     myupdate(local_simulation_vars)
                 else:  # no position
-                    print('')
+                    myupdate(local_simulation_vars)
             # Update the environment state (current step)
             #print('b4 incr. local_simulation_vars[current_step]', local_simulation_vars['current_step'])
             local_simulation_vars['current_step']+=1
             #print('aftr. incr. local_simulation_vars[current_step]', local_simulation_vars['current_step'])
             local_simulation_vars['done'] = local_simulation_vars['current_step'] >= len(data)
-
+            #print('len(data)=', len(data), ',  local_simulation_vars[-done-] =', local_simulation_vars['done'] )
             # Additional info (optional)
             info = {
                 'balance': local_simulation_vars['balance'],
