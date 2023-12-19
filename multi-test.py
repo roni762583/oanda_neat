@@ -17,7 +17,7 @@ from neat.nn import FeedForwardNetwork
 from neat.population import Population
 import copy
 import pickle
-
+import platform
 import matplotlib.pyplot as plt
 #plt.switch_backend('TkAgg')  # Set the Tkinter backend for interactivity
 
@@ -345,10 +345,15 @@ def run_main_process(queue, population):
     queue.put(rewards_lst)
     return rewards_lst
 
-
+'''
 def set_start_method():
     multiprocessing.set_start_method('fork')  # 'spawn'-for windows 'fork'-for *nix
-
+'''
+def set_start_method():
+    if platform.system() == 'Windows':
+        multiprocessing.set_start_method('spawn')
+    else:
+        multiprocessing.set_start_method('fork')
 
 def eval_gemones_multi(genomes, config):
     nets = []
