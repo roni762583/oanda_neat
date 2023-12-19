@@ -421,8 +421,8 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
     
     def myget_pl(local_simulation_vars):
         denominator = 10 ** float(local_simulation_vars['pip_location'])
-        pl_pips = (local_simulation_vars['current_price'] - local_simulation_vars['open_price']) / denominator
-        return pl_pips
+        local_simulation_vars['pl_pips'] = (local_simulation_vars['current_price'] - local_simulation_vars['open_price']) / denominator
+        return local_simulation_vars['pl_pips']
 
     def get_next_observation(local_simulation_vars):
         #simulation_vars['current_step'] = already incremented in mystep()
@@ -507,10 +507,10 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
 
         def myopen_position(order_type_str, local_simulation_vars):
             if local_simulation_vars['volume'] == 0:
-                    local_simulation_vars['open_time'] = local_simulation_vars['current_timestamp']
-                    local_simulation_vars['open_price'] = local_simulation_vars['current_price']
-                    local_simulation_vars['volume'] = 100 if order_type_str=='Buy' else (-100 if order_type_str=='Sell' else 0)
-                    #print('myopen_position() open_time: ', local_simulation_vars['open_time'])
+                local_simulation_vars['open_time'] = local_simulation_vars['current_timestamp']
+                local_simulation_vars['open_price'] = local_simulation_vars['current_price']
+                local_simulation_vars['volume'] = 100 if order_type_str=='Buy' else (-100 if order_type_str=='Sell' else 0)
+                #print('myopen_position() open_time: ', local_simulation_vars['open_time'])
 
         def myupdate(local_simulation_vars):
             # Initialize lwm with a default value
@@ -520,9 +520,9 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
             local_simulation_vars['direction'] = 1 if local_simulation_vars['volume'] > 0 else (-1 if local_simulation_vars['volume'] < 0 else 0)
             
             # skip update if no position, i.e. volume is zero
-            #if local_simulation_vars['volume'] == 0:
+            if local_simulation_vars['volume'] == 0:
                 #print('volume equals zero')
-                # return
+                return
             
             den = local_simulation_vars['total_ticks'] if local_simulation_vars['total_ticks'] > 0 else 1
             local_simulation_vars['underwater_fraction'] = local_simulation_vars['ticks_underwater'] / den
