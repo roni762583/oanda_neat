@@ -488,7 +488,7 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
                 'above_water_fraction': str(local_simulation_vars['above_water_fraction'])
             }
             jsn = json.dumps(position_data)
-            print('myget_position_json(): ', jsn)
+            #print('myget_position_json(): ', jsn)
             return jsn
 
         def myclose_position(local_simulation_vars):
@@ -496,11 +496,11 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
                 #print('open_time at close = ', local_simulation_vars['open_time'])
 
                 # update pos.
-                print('vol1, dir == ', local_simulation_vars['volume'], ', ', local_simulation_vars['current_step'], flush=True)
+                #print('vol1, dir == ', local_simulation_vars['volume'], ', ', local_simulation_vars['current_step'], flush=True)
                 myupdate(local_simulation_vars)
                 local_simulation_vars['close_time'] = local_simulation_vars['current_timestamp']
                 local_simulation_vars['close_price'] = local_simulation_vars['current_price']
-                print('vol4, dir == ', local_simulation_vars['volume'], ', ', local_simulation_vars['current_step'], flush=True)
+                #print('vol4, dir == ', local_simulation_vars['volume'], ', ', local_simulation_vars['current_step'], flush=True)
                 jsn = myget_position_json(local_simulation_vars)
                 myposition_reset(local_simulation_vars)
                 return jsn
