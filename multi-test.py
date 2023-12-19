@@ -581,10 +581,10 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
         def reward_function8(pips_earned, above_water_fraction):
             # Use root logger to check if the configuration is affecting the method
             #logging.info('reward_function8(), executing'+str(type(pips_earned)))
-            reward = 0.001
+            #reward = 0.001
             risk_adj_reward = pips_earned * float(local_simulation_vars['above_water_fraction'])
-            reward += pips_earned # risk_adj_reward
-            #print('reward_function8(), reward = ' + str(reward))
+            reward = pips_earned #risk_adj_reward
+            print('reward_function8(), reward = ' + str(reward))
             return reward
 
         # update done
@@ -597,7 +597,7 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
             #logging.info('current_step %s',local_simulation_vars['current_step'])
             local_simulation_vars['current_price'] = data['bid_c'].iloc[local_simulation_vars['current_step']]
             #logging.info('current_price %s',local_simulation_vars['current_price'])
-            reward = 0.0  
+            reward = 0.0001  
             observation = get_next_observation(local_simulation_vars)
             #print('observation+++:',observation)
             output = network.activate(observation)
