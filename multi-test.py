@@ -19,14 +19,10 @@ import copy
 import pickle
 import platform
 import matplotlib.pyplot as plt
-#plt.switch_backend('TkAgg')  # Set the Tkinter backend for interactivity
-
-#import visualize
 import wget
 import requests
 import json
 import config.acct_config
-
 from config.experiment_config import *
 
 # Configure logging at the script level
@@ -118,7 +114,6 @@ def render(self):
     # Implement rendering or visualization code if needed
     pass
 
-
 def calculate_drawdown(simulation_vars):
     peak = max(simulation_vars['equity_curve']) if max(simulation_vars['equity_curve']) !=0 else 0.000001  #divide by zero
     trough = min(simulation_vars['equity_curve'])
@@ -138,8 +133,6 @@ def get_position_string(simulation_vars):
 def print_position(self):
     print(get_position_string())
 
-# end of functions from trading environment
-
 def get_pip_location(simulation_vars):
     ins_df = pd.read_pickle("data/instruments.pkl")
     simulation_vars['pip_location'] = ins_df['pipLocation'].iloc[-1]
@@ -149,7 +142,6 @@ def get_pip_location(simulation_vars):
 def preprocess_data(simulation_vars):
 
     mypiplocation = get_pip_location(simulation_vars)
-
     # Check if necessary files exist
     files_exist = all(
         [
@@ -169,33 +161,26 @@ def preprocess_data(simulation_vars):
         peak_value = 2.1
         trough_value = 1.9
         sine_wave = sine_wave * 0.1 + 2.0
-
         # Replace 'URL' with the actual URL of the CSV file
         url = 'https://raw.githubusercontent.com/roni762583/AUDJPY-1M/main/DAT_ASCII_AUDJPY_M1_2020.csv'
-
         # Read the CSV file with ';' as the delimiter
         df = pd.read_csv(url, sep=';', header=None, names=['time', 'Open', 'High', 'Low', 'bid_c','vol'], parse_dates=True)
         df = df.drop(columns=['Open', 'High', 'Low', 'vol'])
-
         sin_df = df.copy(deep=True)
         # Slice the DataFrame to match the length of sine_wave
         sin_df = sin_df.iloc[:len(sine_wave)]
         # Assigning the entire DataFrame to the bid_c column
         sin_df['bid_c'] = sine_wave
-
         # Convert the 'time' column to pandas datetime if it's not already in datetime format
         df['time'] = pd.to_datetime(df['time'])
         sin_df['time'] = pd.to_datetime(sin_df['time'])
-
         # number of bars for trend line
         trendline_shift = 12
         mypiplocation = get_pip_location(simulation_vars)
         #print('mypiploc:',mypiplocation)
         den = math.pow(10, mypiplocation)
-
         df['shifted_bid'] = df['bid_c'].shift(trendline_shift, axis=0)
         sin_df['shifted_bid'] = sin_df['bid_c'].shift(trendline_shift, axis=0)
-
         # change since last bar 
         df['pips_delta'] = df['bid_c'].diff()/den # az * from /
         sin_df['pips_delta'] = sin_df['bid_c'].diff()/den # az * from /
@@ -204,29 +189,18 @@ def preprocess_data(simulation_vars):
         sin_df['tl_delta'] = (sin_df['bid_c'] - sin_df['shifted_bid'])/den
         # add case switch for other granularities
         minutes = 1 #if (granularity == "M1") else (5 if (granularity == "M5") else 1)
-
         # in pips per minute 
         df['tl_slope'] = df['tl_delta']/(minutes*trendline_shift)
         sin_df['tl_slope'] = sin_df['tl_delta']/(minutes*trendline_shift)
-
-
         # get rid of extra columns 
         df = df.drop(columns=['shifted_bid', 'tl_delta'])
         sin_df = sin_df.drop(columns=['shifted_bid', 'tl_delta'])
-
-        #print(df.shape, ' b4 drop na')
-        #print(sin_df.shape, 'sin_df b4 drop na')
-
         # sin_df Drop rows that contain NaN/None ONLY in columns: 'pips_delta', 'tl_slope'
         df.dropna(subset=['pips_delta', 'tl_slope'], inplace=True)
         sin_df.dropna(subset=['pips_delta', 'tl_slope'], inplace=True)
-        #print(df.shape, ' after drop na')
-        #print(sin_df.shape, 'sin_df after drop na')
-
         # Reset the index of df
         df = df.reset_index(drop=True)
         sin_df = sin_df.reset_index(drop=True)
-
         # Find the split index (70% of the total rows)
         split_index = int(0.7 * df.shape[0])
         small_split = int(0.0025 * df.shape[0])
@@ -236,11 +210,6 @@ def preprocess_data(simulation_vars):
         # Create neat_df as the first 70% of rows of data from df
         test_df = df.iloc[split_index:]
         pre_train_df = sin_df
-        #print('train_df.shape: ', train_df.shape)
-        #print('small_train_df.shape: ', small_train_df.shape)
-        #print('test_df.shape: ', test_df.shape)
-        #print('pre_train_df.shape: ', pre_train_df.shape)
-        
         # Save data to files
         train_df.to_pickle("data/train_df.pkl")
         test_df.to_pickle("data/test_df.pkl")
@@ -297,58 +266,8 @@ def identify_winner_trades(trade_lists, winner):
     else:
         logging.warning(f"No trade data found for the winner agent with key {winner_agent_key}")
 
-def get_number_of_genomes(population):
-    # Get all species in the population
-    all_species = population.species.values()
-
-    # Initialize a variable to count the total number of genomes
-    total_genomes = 0
-
-    # Iterate through each species
-    for species in all_species:
-        # Get the list of genomes within the species
-        genomes_in_species = species.members
-        
-        # Get the count of genomes in the current species
-        num_genomes_in_species = len(genomes_in_species)
-        
-        # Add the count of genomes in the current species to the total count
-        total_genomes += num_genomes_in_species
-
-    # Print the total number of genomes in the population
-    #print("Number of genomes in the population:", total_genomes)
-    return total_genomes
-
-# main process of multiprocessing
-def run_main_process(queue, population):
-    print('run_main_process(): Running', flush=True)
-    rewards_lst = []
-    while True:
-        try:
-            msg = queue.get(timeout=1)  # Wait for 1 second for new data
-            if msg is not None:
-                rewards_lst.append(msg)
-            else:
-                print('run_main_process() received None')
-                break
-        except Exception as e:
-            print(f"An exception occurred: {e, str(e)}")
-            print('reward msg=',msg)
-            break  # Break the loop on any exception
-
-    print('run_main_process(): Done \n\n', flush=True)
-    print('rewards list queue: ', rewards_lst, flush=True)
-    # Put rewards_lst back into the queue to send it to the main process
-    queue.put(rewards_lst)
-    return rewards_lst
-
-
-
 def set_start_method():
-    #multiprocessing.set_start_method('forkserver') # לא עובד
-    #multiprocessing.set_start_method('fork') # error
-    #multiprocessing.set_start_method('spawn') #
-    #return
+    # 'forkserver' # לא עובד
     if platform.system() == 'Windows':
         multiprocessing.set_start_method('spawn')
         print('windows detected - using spawn multiprocessing method')
@@ -356,15 +275,12 @@ def set_start_method():
         multiprocessing.set_start_method('fork')
         print('non-windows detected - using fork multiprocessing method')
 
-
-
 def eval_gemones_multi(genomes, config):
     nets = []
     agents = []
     ge = []
     processes = []
     rewards_lst = []  # To collect rewards
-
     # Build genome network lists and start processes
     for genome_id, genome in genomes:
         genome.fitness = 0
@@ -380,7 +296,6 @@ def eval_gemones_multi(genomes, config):
     # Join all simulation processes
     for p in processes:
         p.join()
-
     # Collect rewards
     for p in processes:
         try:
@@ -405,10 +320,7 @@ def eval_gemones_multi(genomes, config):
         for genome_id, genome in genomes:
             if genome_id in reward_dict:
                 genome.fitness = reward_dict[genome_id]
-                
 # end eval_gemones_multi()
-
-
 
 # Code for evaluating a single genome
 def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (neat_df, network)
