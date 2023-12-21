@@ -336,8 +336,8 @@ def run_main_process(queue, population):
             print('reward msg=',msg)
             break  # Break the loop on any exception
 
-    print('run_main_process(): Done', flush=True)
-    #print('rewards list queue: ', rewards_lst)
+    print('run_main_process(): Done \n\n', flush=True)
+    print('rewards list queue: ', rewards_lst, flush=True)
     # Put rewards_lst back into the queue to send it to the main process
     queue.put(rewards_lst)
     return rewards_lst
@@ -345,6 +345,10 @@ def run_main_process(queue, population):
 
 
 def set_start_method():
+    #multiprocessing.set_start_method('forkserver') # לא עובד
+    #multiprocessing.set_start_method('fork') # error
+    #multiprocessing.set_start_method('spawn') #
+    #return
     if platform.system() == 'Windows':
         multiprocessing.set_start_method('spawn')
         print('windows detected - using spawn multiprocessing method')
@@ -353,47 +357,56 @@ def set_start_method():
         print('non-windows detected - using fork multiprocessing method')
 
 
+
 def eval_gemones_multi(genomes, config):
     nets = []
     agents = []
     ge = []
     processes = []
-    #queue = Queue()
+    rewards_lst = []  # To collect rewards
 
-    # build genome and network lists  
+    # Build genome network lists and start processes
     for genome_id, genome in genomes:
         genome.fitness = 0
         ge.append(genome)
         net = neat.nn.FeedForwardNetwork.create(genome, config)
         nets.append(net)
-        data_tuple = (neat_df.copy(deep=True), net, genome_id)
-        
-    # Iterate through genomes to create processes
-    for genome_id, genome in genomes:
         # Create a copy of simulation_vars for each simulation
         local_simulation_vars = copy.deepcopy(simulation_vars)
         data_tuple = (neat_df.copy(deep=True), net, genome_id)  # Update this line based on your logic
         p = Process(target=evaluate_genome, args=(queue, data_tuple, local_simulation_vars))
         processes.append(p)
         p.start()
-    
-    main_process = Process(target=run_main_process, args=(queue, population))
-    main_process.start()
-    queue.put(None)
-    # Wait for the main_process to finish and capture its return value
-    results = main_process.join()  # This will get the return value from run_main_process
-    if(not results):
-        print('not results')
+    # Join all simulation processes
+    for p in processes:
+        p.join()
+
+    # Collect rewards
+    for p in processes:
+        try:
+            msg = queue.get(timeout=1)
+            if msg is not None:
+                rewards_lst.extend(msg)
+            else:
+                break
+        except Exception as e:
+            print(f"An exception occurred: {e, str(e)}")
+            break  # Break the loop on any exception
+
+    # Processing rewards_lst or any other necessary actions based on collected data
+    if not rewards_lst:
+        print('No results received !!!\n\n\n')
     else:
+        print('Received rewards:\n', rewards_lst)
         # Create a dictionary to map genome_id to total_reward
-        reward_dict = {genome_id: total_reward for (genome_id, total_reward, _) in results}
-        print(reward_dict)
+        reward_dict = {genome_id: total_reward for (genome_id, total_reward, _) in rewards_lst}
+        print('Reward dictionary: ', reward_dict)
         # Iterate through genomes and assign fitness based on the reward dictionary
         for genome_id, genome in genomes:
             if genome_id in reward_dict:
                 genome.fitness = reward_dict[genome_id]
-
-
+                
+# end eval_gemones_multi()
 
 
 
@@ -658,7 +671,7 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
             #logging.info('mystep(): %s\n%s\n%s\n%s', observation, reward, done, info)
             return observation, reward, local_simulation_vars['done'], info
         else:  # If episode is done
-            print('trades list:', trades_list)
+            #logging.info('trades list: ', trades_list)
             return (0.0,0.0,0.0,0), 0.0, local_simulation_vars['done'], {}  # Return default values or None when the episode is done
     # end mystep()
 
@@ -667,7 +680,7 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
     total_reward = 0.0
     next_observation = get_next_observation(local_simulation_vars) 
     #print('first.next_observation: ', next_observation)
-    prev_net_idx = -9
+    
     while not local_simulation_vars['done']:
         #print('next_observation=',next_observation)
         output = network.activate(next_observation)
