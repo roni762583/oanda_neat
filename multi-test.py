@@ -689,8 +689,6 @@ if __name__ == '__main__':
     population = load_population(config)
     
     winner = population.run(eval_gemones_multi, n)
-    '''
-    #print('winner is ... ', winner)
+    
+    print('winner is ... ', winner)
     best_genome_filename = pickle_best_genome(winner)
-
-    '''
