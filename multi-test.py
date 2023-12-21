@@ -311,7 +311,7 @@ def eval_gemones_multi(genomes, config):
 
     # Processing rewards_lst or any other necessary actions based on collected data
     if not rewards_lst:
-        #print('No results received !!!\n\n\n')
+        pass #print('No results received !!!\n\n\n')
     else:
         #print('Received rewards:\n', rewards_lst)
         # Process the rewards list
