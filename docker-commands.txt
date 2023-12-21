@@ -2,5 +2,5 @@ docker build -t oanda_neat .         # to build image
 
 docker run oanda_neat
 
-docker run -v /g/My\ Drive/ZBAIDA_LLC/Trading/NEAT/oanda_neat:/oanda_neat oanda_neat
+docker run -v "$(pwd):/app" oanda_neat
 
