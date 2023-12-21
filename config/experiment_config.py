@@ -20,7 +20,7 @@ volume = 10
 initial_balance = 1000
 
 # Run for up to n generations. eval_genomes acts as fitness function
-n = 100
+n = 20
 
 # Define reward parameters
 gamma = 0.95                   # reward_fuction()
