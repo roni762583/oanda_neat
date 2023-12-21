@@ -186,9 +186,6 @@ def preprocess_data(simulation_vars):
         # Convert the 'time' column to pandas datetime if it's not already in datetime format
         df['time'] = pd.to_datetime(df['time'])
         sin_df['time'] = pd.to_datetime(sin_df['time'])
-        
-        # Calculate the time differences (time deltas)
-        time_diffs = df['time'].diff()
 
         # number of bars for trend line
         trendline_shift = 12
@@ -340,20 +337,21 @@ def run_main_process(queue, population):
             break  # Break the loop on any exception
 
     print('run_main_process(): Done', flush=True)
-    print('rewards list queue: ', rewards_lst)
+    #print('rewards list queue: ', rewards_lst)
     # Put rewards_lst back into the queue to send it to the main process
     queue.put(rewards_lst)
     return rewards_lst
 
-'''
-def set_start_method():
-    multiprocessing.set_start_method('fork')  # 'spawn'-for windows 'fork'-for *nix
-'''
+
+
 def set_start_method():
     if platform.system() == 'Windows':
         multiprocessing.set_start_method('spawn')
+        print('windows detected - using spawn multiprocessing method')
     else:
         multiprocessing.set_start_method('fork')
+        print('non-windows detected - using fork multiprocessing method')
+
 
 def eval_gemones_multi(genomes, config):
     nets = []
@@ -368,14 +366,13 @@ def eval_gemones_multi(genomes, config):
         ge.append(genome)
         net = neat.nn.FeedForwardNetwork.create(genome, config)
         nets.append(net)
-
-        data_tuple = (neat_df.copy(deep=True), net)
+        data_tuple = (neat_df.copy(deep=True), net, genome_id)
         
     # Iterate through genomes to create processes
-    for _, genome in genomes:
+    for genome_id, genome in genomes:
         # Create a copy of simulation_vars for each simulation
         local_simulation_vars = copy.deepcopy(simulation_vars)
-        data_tuple = (neat_df.copy(deep=True), net)  # Update this line based on your logic
+        data_tuple = (neat_df.copy(deep=True), net, genome_id)  # Update this line based on your logic
         p = Process(target=evaluate_genome, args=(queue, data_tuple, local_simulation_vars))
         processes.append(p)
         p.start()
@@ -388,27 +385,21 @@ def eval_gemones_multi(genomes, config):
     if(not results):
         print('not results')
     else:
-        # Check if the lengths of both lists are equal
-        if len(genomes) == len(results):
-            # Create a new list to store genomes with fitness
-            genomes_with_fitness = []
+        # Create a dictionary to map genome_id to total_reward
+        reward_dict = {genome_id: total_reward for (genome_id, total_reward, _) in results}
+        print(reward_dict)
+        # Iterate through genomes and assign fitness based on the reward dictionary
+        for genome_id, genome in genomes:
+            if genome_id in reward_dict:
+                genome.fitness = reward_dict[genome_id]
 
-            # Iterate through each pair of genome and result using zip
-            for (genome_id, genome_data), result in zip(genomes, results):
-
-                # ASSIGN GENOME FITNESS
-                genome_data.fitness = result
-                
-        else:
-            print("Genomes and results lists have different lengths.")
-        print('results: ', results)
 
 
 
 
 # Code for evaluating a single genome
 def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (neat_df, network)
-    neat_df_cp, network = data_tuple
+    neat_df_cp, network, genome_id = data_tuple
     
     data = neat_df_cp.copy()
     data_copy = neat_df_cp.copy()
@@ -426,7 +417,13 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
     
     def myget_pl(local_simulation_vars):
         denominator = 10 ** float(local_simulation_vars['pip_location'])
-        local_simulation_vars['pl_pips'] = (local_simulation_vars['current_price'] - local_simulation_vars['open_price']) / denominator
+        if(local_simulation_vars['direction']==1) :
+            numerator = local_simulation_vars['current_price'] -  local_simulation_vars['open_price']
+        elif(local_simulation_vars['direction']==-1):
+            numerator = local_simulation_vars['open_price'] - local_simulation_vars['current_price']
+        else:
+            return 0.0
+        local_simulation_vars['pl_pips'] = numerator / denominator
         return local_simulation_vars['pl_pips']
 
     def get_next_observation(local_simulation_vars):
@@ -584,7 +581,7 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
             #reward = 0.001
             risk_adj_reward = pips_earned * float(local_simulation_vars['above_water_fraction'])
             reward = pips_earned #risk_adj_reward
-            print('reward_function8(), reward = ' + str(reward))
+            #print('reward_function8(), reward = ' + str(reward))
             return reward
 
         # update done
@@ -627,7 +624,7 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
                     # close position
                     jsn = myclose_position(local_simulation_vars)
                     # append closed position to trades list
-                    logging.info('close pos. jsn: %s', jsn)
+                    #logging.info('close pos. jsn: %s', jsn)
                     trades_list.append(jsn)
                     # Parse the JSON string into a Python object
                     position_json = json.loads(jsn)
@@ -635,7 +632,7 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
                     above_water_fraction = position_json['above_water_fraction']
                     pips_earned = position_json['p_l']
                     reward = reward_function8(pips_earned, above_water_fraction)
-                    logging.info('on close reward = %s', reward)
+                    #logging.info('on close reward = %s', reward)
                 else:  # no position open
                     pass
                     #logging.info('cannot close, no position open')
@@ -680,9 +677,14 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
         next_observation, reward, local_simulation_vars['done'], info = mystep(local_simulation_vars)
         total_reward += reward
         
-    # add to the queue
-    queue.put((total_reward, trades_list))#total_reward)
+    # end of simulation, zero out non-traders, and add to the queue
+    if len(trades_list)>0:
+        queue.put((genome_id, total_reward, trades_list))
+    else:
+        #print('empty trades list - zeroing reward ')
+        total_reward = 0.0
 
+    
     return total_reward
 # end evaluate_genome()
 

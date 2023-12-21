@@ -15,12 +15,12 @@ SECURE_HEADER = {
 
 spread = 1.5 # pips (for cost calc.)
 
-volume = 100
+volume = 10
 
 initial_balance = 1000
 
 # Run for up to n generations. eval_genomes acts as fitness function
-n = 5
+n = 100
 
 # Define reward parameters
 gamma = 0.95                   # reward_fuction()
