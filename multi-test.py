@@ -24,6 +24,7 @@ import requests
 import json
 import config.acct_config
 from config.experiment_config import *
+from queue import Empty
 
 # Configure logging at the script level
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -300,7 +301,7 @@ def eval_gemones_multi(genomes, config):
     for p in processes:
         try:
             msg = queue.get(timeout=1)
-            if msg is not None:
+            if msg is not Empty():
                 rewards_lst.extend(msg)
             else:
                 break
@@ -313,13 +314,28 @@ def eval_gemones_multi(genomes, config):
         print('No results received !!!\n\n\n')
     else:
         print('Received rewards:\n', rewards_lst)
-        # Create a dictionary to map genome_id to total_reward
-        reward_dict = {genome_id: total_reward for (genome_id, total_reward, _) in rewards_lst}
-        print('Reward dictionary: ', reward_dict)
-        # Iterate through genomes and assign fitness based on the reward dictionary
-        for genome_id, genome in genomes:
-            if genome_id in reward_dict:
-                genome.fitness = reward_dict[genome_id]
+        # Process the rewards list
+        reward_dict = {}
+        # Iterate through each entry in rewards_lst and assign fitness to genomes
+        # Reconstruct the list of tuples
+        genomes_with_rewards = [(rewards_lst[i], rewards_lst[i + 1]) for i in range(0, len(rewards_lst), 2)]
+
+        # Print the reconstructed list of tuples
+        print('Print the reconstructed list:\n')
+        print(genomes_with_rewards)
+        #print('\n entries: \n')
+        for entry in genomes_with_rewards:
+            print('entry: ', entry)
+            genome_id = entry[0]
+            total_reward = entry[1]
+            # Assuming genomes is a list of tuples [(genome_id, genome), ...]
+            for gid, genome in genomes:
+                if gid == genome_id:
+                    # Assign fitness based on total_reward to the matching genome
+                    genome.fitness = total_reward
+                else:
+                    genome.fitness = 0.0
+            
 # end eval_gemones_multi()
 
 # Code for evaluating a single genome
@@ -604,18 +620,14 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
         
     # end of simulation, zero out non-traders, and add to the queue
     if len(trades_list)>0:
-        queue.put((genome_id, total_reward, trades_list))
+        queue.put((genome_id, total_reward)) #, trades_list))
     else:
         #print('empty trades list - zeroing reward ')
         total_reward = 0.0
-
     
     return total_reward
 # end evaluate_genome()
 
-def set_network(self, input_net):
-    self.net = input_net
-    self.trading_env.net = self.net
     
 
 # entry point
