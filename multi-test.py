@@ -217,7 +217,7 @@ def preprocess_data(simulation_vars):
         small_train_df.to_pickle("data/small_train_df.pkl")
         pre_train_df.to_pickle("data/pre_train_df.pkl")
     # Load neat_df
-    neat_df = pd.read_pickle("data/pre_train_df.pkl")
+    neat_df = pd.read_pickle("data/small_train_df.pkl")
     #print('neat_df.shape: ', neat_df.shape)
     return mypiplocation, neat_df
 
@@ -311,9 +311,9 @@ def eval_gemones_multi(genomes, config):
 
     # Processing rewards_lst or any other necessary actions based on collected data
     if not rewards_lst:
-        print('No results received !!!\n\n\n')
+        #print('No results received !!!\n\n\n')
     else:
-        print('Received rewards:\n', rewards_lst)
+        #print('Received rewards:\n', rewards_lst)
         # Process the rewards list
         reward_dict = {}
         # Iterate through each entry in rewards_lst and assign fitness to genomes
@@ -321,11 +321,11 @@ def eval_gemones_multi(genomes, config):
         genomes_with_rewards = [(rewards_lst[i], rewards_lst[i + 1]) for i in range(0, len(rewards_lst), 2)]
 
         # Print the reconstructed list of tuples
-        print('Print the reconstructed list:\n')
-        print(genomes_with_rewards)
+        #print('Print the reconstructed list:\n')
+        #print(genomes_with_rewards)
         #print('\n entries: \n')
         for entry in genomes_with_rewards:
-            print('entry: ', entry)
+            #print('entry: ', entry)
             genome_id = entry[0]
             total_reward = entry[1]
             # Assuming genomes is a list of tuples [(genome_id, genome), ...]
