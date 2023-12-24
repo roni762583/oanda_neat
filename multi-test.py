@@ -1,4 +1,5 @@
 import os
+import re
 import os.path
 import time
 from time import sleep
@@ -25,6 +26,7 @@ import json
 import config.acct_config
 from config.experiment_config import *
 from queue import Empty
+import gzip
 
 # Configure logging at the script level
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -205,8 +207,9 @@ def preprocess_data(simulation_vars):
         # Find the split index (70% of the total rows)
         split_index = int(0.7 * df.shape[0])
         small_split = int(0.0025 * df.shape[0])
+        small_next_split = int(0.0075 * df.shape[0])
         # Create neat_df as the first 70% of rows of data from df
-        small_train_df = df.iloc[:small_split]
+        small_train_df = df.iloc[small_split:small_next_split]
         train_df = df.iloc[:split_index]
         # Create neat_df as the first 70% of rows of data from df
         test_df = df.iloc[split_index:]
@@ -278,7 +281,6 @@ def set_start_method():
 
 def eval_gemones_multi(genomes, config):
     nets = []
-    agents = []
     ge = []
     processes = []
     rewards_lst = []  # To collect rewards
@@ -521,8 +523,7 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
             #logging.info('reward_function8(), executing'+str(type(pips_earned)))
             #reward = 0.001
             risk_adj_reward = pips_earned * float(local_simulation_vars['above_water_fraction'])
-            reward = pips_earned #risk_adj_reward
-            #print('reward_function8(), reward = ' + str(reward))
+            reward = risk_adj_reward
             return reward
 
         # update done
@@ -684,10 +685,45 @@ if __name__ == '__main__':
     
     total_rewards_list = []
 
-    # get population
+    # find last checkpoint
+    def get_highest_checkpoint():
+        # Define the checkpoint directory
+        checkpoint_dir = 'checkpoints/'
+        # Get all the checkpoint file names
+        checkpoint_files = os.listdir(checkpoint_dir)
+        # Filter and extract checkpoint numbers
+        checkpoint_numbers = [
+            int(re.search(r'neat-checkpoint-(\d+)', file).group(1))
+            for file in checkpoint_files
+            if re.match(r'neat-checkpoint-\d+', file)
+        ]
+
+        if checkpoint_numbers:
+            highest_checkpoint = max(checkpoint_numbers)
+            return f'checkpoints/neat-checkpoint-{highest_checkpoint}'
+        else:
+            return None
+
+    def restore_checkpoint(filename):
+        """Resumes the simulation from a previous saved point."""
+        with gzip.open(filename) as f:
+            generation, config, population, species_set, rndstate = pickle.load(f)
+            #random.setstate(rndstate)
+            return Population(config, (population, species_set, generation))
+
+    def load_population(config):
+        # Check for existing checkpoints
+        checkpoint_path = get_highest_checkpoint()
+        if checkpoint_path:
+            print(f"Loading population from checkpoint: {checkpoint_path}")
+            population =  restore_checkpoint(checkpoint_path)
+        else:
+            print("No checkpoints found. Creating new population.")
+            population = Population(config)
+        return population
+
     config = create_neat_config()
     population = load_population(config)
-    
     winner = population.run(eval_gemones_multi, n)
     
     print('winner is ... ', winner)

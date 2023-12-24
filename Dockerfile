@@ -15,3 +15,4 @@ COPY . /app
 
 # Command to run the Python application
 CMD ["python", "multi-test.py"]
+#CMD ["python", "test_genome.py"]
