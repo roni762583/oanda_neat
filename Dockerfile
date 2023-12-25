@@ -10,9 +10,26 @@ COPY requirements.txt /app
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
+# Create directories and copy their content
+RUN mkdir /app/trades
+COPY trades /app/trades
+
+RUN mkdir /app/src
+COPY src /app/src
+
+RUN mkdir /app/data
+COPY data /app/data
+
+RUN mkdir /app/config
+COPY config /app/config
+
+RUN mkdir /app/checkpoints
+COPY config /app/checkpoints
+
 # Copy the entire project directory into the container at /app
 COPY . /app
 
-# Command to run the Python application
-CMD ["python", "multi-test.py"]
+# default Command to run the Python application without specifying parameter test
+#CMD ["python", "multi-test.py"]
 #CMD ["python", "test_genome.py"]
+CMD ["python", "new_main.py"]

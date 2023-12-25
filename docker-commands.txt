@@ -4,3 +4,11 @@ docker run oanda_neat
 
 docker run -v "$(pwd):/app" oanda_neat
 
+docker run -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix oanda_neat
+
+
+docker run -v "$(pwd):/app" -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix oanda_neat
+
+# to run test genome use command below, default is multi_test.py:
+
+docker run -v "$(pwd):/app" oanda_neat python main.py test

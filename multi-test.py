@@ -157,7 +157,6 @@ def preprocess_data(simulation_vars):
 
     if not files_exist:
         # Data preprocessing steps...
-        # sine wave csv
         num_points = 80  # Total number of points
         sine_wave = np.sin(np.linspace(0, 4 * np.pi, num_points))
         # Adjusting the sine wave to oscillate around 2.0 with an amplitude of 1.0
@@ -232,43 +231,13 @@ def create_neat_config():
                                 config_file)
     return config
 
-def load_population(config):
-    # Create the NEAT population using the provided configuration
-    p = neat.Population(config)
-    # Create a directory to store checkpoints if it doesn't exist
-    checkpoint_dir = 'checkpoints'
-    os.makedirs(checkpoint_dir, exist_ok=True)
-    # Set up the checkpointer to save checkpoints in the specified directory
-    checkpoint_interval = 1  # Adjust the checkpoint interval as needed
-    checkpointer = neat.Checkpointer(generation_interval=checkpoint_interval,
-                                     filename_prefix=os.path.join(checkpoint_dir, 'neat-checkpoint-'))
-    p.add_reporter(neat.StdOutReporter(True))
-    stats = neat.StatisticsReporter()
-    p.add_reporter(stats)
-    p.add_reporter(checkpointer) # neat.Checkpointer(1))
-    return p
-
 def pickle_best_genome(winner):
     # Save the best-performing genome to a file
-    best_genome_filename = "models/best_genome.pkl"
+    current_time = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    best_genome_filename = f'models/best_genome{current_time}.pkl'
     with open(best_genome_filename, "wb") as best_genome_file:
         pickle.dump(winner, best_genome_file)
     return best_genome_filename
-
-def identify_winner_trades(trade_lists, winner):
-    # Identify and save winner agent's trades
-    winner_agent_key = winner.key
-    winner_agent_trades = None
-    # Logic to find winner's trades within trade_lists...
-    if winner_agent_trades is not None:
-        winner_agent_trade_filename = "trades/winner_agent_trades.txt"
-        # Save the winner agent's trades to a file
-        with open(winner_agent_trade_filename, "w") as trade_file:
-            for trade in winner_agent_trades:
-                trade_file.write(trade + '\n')
-        logging.info(f"Winner agent's trades saved to {winner_agent_trade_filename}")
-    else:
-        logging.warning(f"No trade data found for the winner agent with key {winner_agent_key}")
 
 def set_start_method():
     # 'forkserver' # לא עובד
@@ -308,7 +277,7 @@ def eval_gemones_multi(genomes, config):
             else:
                 break
         except Exception as e:
-            print(f"An exception occurred: {e, str(e)}")
+            #print(f"An exception occurred: {e, str(e)}")
             break  # Break the loop on any exception
 
     # Processing rewards_lst or any other necessary actions based on collected data
@@ -317,7 +286,7 @@ def eval_gemones_multi(genomes, config):
     else:
         #print('Received rewards:\n', rewards_lst)
         # Process the rewards list
-        reward_dict = {}
+        
         # Iterate through each entry in rewards_lst and assign fitness to genomes
         # Reconstruct the list of tuples
         genomes_with_rewards = [(rewards_lst[i], rewards_lst[i + 1]) for i in range(0, len(rewards_lst), 2)]
@@ -343,9 +312,9 @@ def eval_gemones_multi(genomes, config):
 # Code for evaluating a single genome
 def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (neat_df, network)
     neat_df_cp, network, genome_id = data_tuple
-    
+    global top_genomes
     data = neat_df_cp.copy()
-    data_copy = neat_df_cp.copy()
+    #data_copy = neat_df_cp.copy()
 
     trades_list = []
     
@@ -356,7 +325,6 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
     ch = logging.StreamHandler()
     ch.setFormatter(formatter)
     logger.addHandler(ch)
-    
     
     def myget_pl(local_simulation_vars):
         denominator = 10 ** float(local_simulation_vars['pip_location'])
@@ -517,13 +485,12 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
             local_simulation_vars['profit_over_underwater_fraction_and_mdd'] = local_simulation_vars['profit_over_underwater_fraction'] / local_simulation_vars['mdd']
         # end myupdate()
 
-
-        def reward_function8(pips_earned, above_water_fraction):
+        def reward_function(pips_earned, above_water_fraction):
             # Use root logger to check if the configuration is affecting the method
             #logging.info('reward_function8(), executing'+str(type(pips_earned)))
             #reward = 0.001
             risk_adj_reward = pips_earned * float(local_simulation_vars['above_water_fraction'])
-            reward = risk_adj_reward
+            reward = pips_earned #risk_adj_reward
             return reward
 
         # update done
@@ -573,7 +540,7 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
                     # Access the above_water_fraction value from the received JSON object
                     above_water_fraction = position_json['above_water_fraction']
                     pips_earned = position_json['p_l']
-                    reward = reward_function8(pips_earned, above_water_fraction)
+                    reward = reward_function(pips_earned, above_water_fraction)
                     #logging.info('on close reward = %s', reward)
                 else:  # no position open
                     pass
@@ -604,11 +571,10 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
             return (0.0,0.0,0.0,0), 0.0, local_simulation_vars['done'], {}  # Return default values or None when the episode is done
     # end mystep()
 
-
     # loop over data and simulate trading
     total_reward = 0.0
     next_observation = get_next_observation(local_simulation_vars) 
-    #print('first.next_observation: ', next_observation)
+    # Initialize a list to keep track of the top genomes and their profits
     
     while not local_simulation_vars['done']:
         #print('next_observation=',next_observation)
@@ -620,6 +586,12 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
         total_reward += reward
         
     # end of simulation, zero out non-traders, and add to the queue
+    # Keep track of the top genomes and their rewards
+    genome_info = {'total_reward': total_reward, 'genome_id': genome_id, 'trades_list': trades_list}  # Replace current_genome_id with the actual ID of the genome
+    top_genomes.append(genome_info)
+    top_genomes = sorted(top_genomes, key=lambda x: x['total_reward'], reverse=True)[:10]  # Keep only the top ten genomes
+    #logging.info('top_genomes: ', top_genomes)
+    # write top genomes to file?
     if len(trades_list)>0:
         queue.put((genome_id, total_reward)) #, trades_list))
     else:
@@ -629,7 +601,6 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
     return total_reward
 # end evaluate_genome()
 
-    
 
 # entry point
 if __name__ == '__main__':
@@ -647,7 +618,7 @@ if __name__ == '__main__':
     manager = Manager()
     queue = manager.Queue()
     global_vars = manager.dict()
-    
+    top_genomes = manager.list()
     # Define your global variables
     simulation_vars = {
         'volume': 0,
@@ -676,14 +647,15 @@ if __name__ == '__main__':
         'profit_over_mdd': 0,
         'profit_over_underwater_fraction_and_mdd': 0,
         'equity_curve': [-1 * spread],  # Assuming equity_curve starts with cost
-        'direction': 0  # -1 short, +1 long
+        'direction': 0,  # -1 short, +1 long
+        'top_genomes': top_genomes
     }
+    # Add top_genomes to simulation_vars
+    simulation_vars['top_genomes'] = top_genomes
     
     get_and_pickle_instrument_info(API_KEY, ACCOUNT_ID, config.experiment_config.instrument)
 
     simulation_vars['mypiplocation'], neat_df = preprocess_data(simulation_vars)
-    
-    total_rewards_list = []
 
     # find last checkpoint
     def get_highest_checkpoint():
@@ -710,7 +682,7 @@ if __name__ == '__main__':
             generation, config, population, species_set, rndstate = pickle.load(f)
             #random.setstate(rndstate)
             return Population(config, (population, species_set, generation))
-
+    '''
     def load_population(config):
         # Check for existing checkpoints
         checkpoint_path = get_highest_checkpoint()
@@ -721,9 +693,94 @@ if __name__ == '__main__':
             print("No checkpoints found. Creating new population.")
             population = Population(config)
         return population
+        
+    def load_population(config):
+        # Create the NEAT population using the provided configuration
+        p = neat.Population(config)
+        # Create a directory to store checkpoints if it doesn't exist
+        checkpoint_dir = 'checkpoints/'
+        os.makedirs(checkpoint_dir, exist_ok=True)
+        # Set up the checkpointer to save checkpoints in the specified directory
+        checkpoint_interval = 1  # Adjust the checkpoint interval as needed
+        checkpointer = neat.Checkpointer(generation_interval=checkpoint_interval,
+                                        filename_prefix=os.path.join(checkpoint_dir, 'neat-checkpoint-'))
+        p.add_reporter(neat.StdOutReporter(True))
+        stats = neat.StatisticsReporter()
+        p.add_reporter(stats)
+        p.add_reporter(checkpointer) # neat.Checkpointer(1))
+        return p
+    '''
+    def load_population(config):
+        # Check for existing checkpoints
+        checkpoint_path = get_highest_checkpoint()
+        if checkpoint_path:
+            print(f"Loading population from checkpoint: {checkpoint_path}")
+            population = restore_checkpoint(checkpoint_path)
+        else:
+            print("No checkpoints found. Creating new population.")
+            population = Population(config)
+            # Create a directory to store checkpoints if it doesn't exist
+            checkpoint_dir = 'checkpoints/'
+            os.makedirs(checkpoint_dir, exist_ok=True)
+            # Set up the checkpointer to save checkpoints in the specified directory
+            checkpoint_interval = 1  # Adjust the checkpoint interval as needed
+            checkpointer = neat.Checkpointer(generation_interval=checkpoint_interval,
+                                            filename_prefix=os.path.join(checkpoint_dir, 'neat-checkpoint-'))
+            population.add_reporter(neat.StdOutReporter(True))
+            stats = neat.StatisticsReporter()
+            population.add_reporter(stats)
+            population.add_reporter(checkpointer)
+        return population
+
+
+    def plot_neat_df(*col_names):
+        import matplotlib.pyplot as plt
+        import datetime
+        from datetime import datetime
+        # Create a new figure for the trades
+        plt.figure(figsize=(12, 6))
+
+        for col_name in col_names:
+            # Plot each specified column
+            plt.plot(neat_df.index, neat_df[col_name], label=col_name)
+
+        # Set labels and title
+        plt.xlabel('Time')
+        plt.ylabel('Price')
+        plt.title('NEAT DataFrame Plot')
+
+        # Show the chart with specified columns
+        plt.legend(loc='best')
+        plt.grid(True)
+        plt.tight_layout()
+
+        # Get the current timestamp
+        current_time = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        # Save the plot as an image file
+        plot_file_name = f'graphs/{current_time}_{"_".join(col_names)}.png'
+        plt.savefig(plot_file_name)
+        plt.show()
+
 
     config = create_neat_config()
+    plot_neat_df('pips_delta', 'tl_slope')
     population = load_population(config)
+
+
+    import subprocess
+    def print_pwd_and_ls():
+        # Execute 'pwd' command
+        pwd_output = subprocess.run(['pwd'], capture_output=True, text=True)
+        print("Current Directory (pwd):")
+        print(pwd_output.stdout)
+
+        # Execute 'ls -la' command
+        ls_output = subprocess.run(['ls', '-la'], capture_output=True, text=True)
+        print("\nDirectory Listing (ls -la):")
+        print(ls_output.stdout)
+    # Call the function to print pwd and ls -la
+    print_pwd_and_ls()
+
     winner = population.run(eval_gemones_multi, n)
     
     print('winner is ... ', winner)

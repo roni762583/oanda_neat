@@ -9,9 +9,10 @@ import math
 from config.experiment_config import *
 import json
 import datetime
+from datetime import datetime, timedelta
 
-def load_best_genome():
-    best_genome_path = 'models/best_genome.pkl'
+def load_best_genome(filename):
+    best_genome_path = f'models/{filename}'
     try:
         with open(best_genome_path, 'rb') as file:
             best_genome = pickle.load(file)
@@ -223,7 +224,7 @@ def preprocess_data(simulation_vars):
         small_train_df.to_pickle("data/small_train_df.pkl")
         pre_train_df.to_pickle("data/pre_train_df.pkl")
     # Load neat_df
-    neat_df = pd.read_pickle("data/test_df.pkl")
+    neat_df = pd.read_pickle("data/small_train_df.pkl")
     #print('neat_df.shape: ', neat_df.shape)
     return mypiplocation, neat_df
 
@@ -441,7 +442,7 @@ def simulate_trading(local_simulation_vars, neat_df_cp, network):
                 # Access the above_water_fraction value from the received JSON object
                 above_water_fraction = position_json['above_water_fraction']
                 pips_earned = position_json['p_l']
-                print('closed pos. P/L: ', pips_earned)
+                #print('closed pos. P/L: ', pips_earned)
             else:  # no position open
                 pass
         elif action == 3:  # No action
@@ -563,14 +564,38 @@ if __name__ == '__main__':
 
     simulation_vars['mypiplocation'], neat_df = preprocess_data(simulation_vars)
     
+    '''
+    import subprocess
+
+    def print_pwd_and_ls():
+        # Execute 'pwd' command
+        pwd_output = subprocess.run(['pwd'], capture_output=True, text=True)
+        print("Current Directory (pwd):")
+        print(pwd_output.stdout)
+
+        # Execute 'ls -la' command
+        ls_output = subprocess.run(['ls', '-la'], capture_output=True, text=True)
+        print("\nDirectory Listing (ls -la):")
+        print(ls_output.stdout)
+
+    def print_models_directory():
+        # Execute 'ls -la' command in the models directory
+        ls_output = subprocess.run(['ls', '-la', '/app/models'], capture_output=True, text=True)
+        print("\nContents of /app/models:")
+        print(ls_output.stdout)
+    # Call the function to print pwd and ls -la
+    print_pwd_and_ls()
+    # Call the function to print the contents of /app/models directory
+    print_models_directory()
+    '''
     # load models/best_genome.pkl
-    test_genome = load_best_genome()
+    test_genome = load_best_genome('best_genome.pkl')
 
     network = create_network(test_genome)
     
     # run data observations through network to get actions, rewards, and trades list
     trades_list = simulate_trading(simulation_vars, neat_df, network)
-    print('returned trades list: \n', trades_list)
+    #print('returned trades list: \n', trades_list)
     # Get the current timestamp
     current_time = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 

@@ -1,0 +1,1 @@
+{"direction": 1, "volume": 100, "open_price": 2.0943413299722136, "close_price": 2.097617631441905, "p_l": 0.32763014696914894, "open_time": "2020-01-01 17:12:00", "close_time": "2020-01-01 17:48:00", "duration": "0 days 00:36:00", "above_water_fraction": "0.027777777777777776"}
