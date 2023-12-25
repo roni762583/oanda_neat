@@ -716,6 +716,17 @@ if __name__ == '__main__':
         if checkpoint_path:
             print(f"Loading population from checkpoint: {checkpoint_path}")
             population = restore_checkpoint(checkpoint_path)
+            # Create a directory to store checkpoints if it doesn't exist
+            checkpoint_dir = 'checkpoints/'
+            os.makedirs(checkpoint_dir, exist_ok=True)
+            # Set up the checkpointer to save checkpoints in the specified directory
+            checkpoint_interval = 1  # Adjust the checkpoint interval as needed
+            checkpointer = neat.Checkpointer(generation_interval=checkpoint_interval,
+                                            filename_prefix=os.path.join(checkpoint_dir, 'neat-checkpoint-'))
+            population.add_reporter(neat.StdOutReporter(True))
+            stats = neat.StatisticsReporter()
+            population.add_reporter(stats)
+            population.add_reporter(checkpointer)
         else:
             print("No checkpoints found. Creating new population.")
             population = Population(config)
@@ -763,10 +774,10 @@ if __name__ == '__main__':
 
 
     config = create_neat_config()
-    plot_neat_df('pips_delta', 'tl_slope')
+    #plot_neat_df('pips_delta', 'tl_slope')
     population = load_population(config)
 
-
+    '''
     import subprocess
     def print_pwd_and_ls():
         # Execute 'pwd' command
@@ -780,7 +791,7 @@ if __name__ == '__main__':
         print(ls_output.stdout)
     # Call the function to print pwd and ls -la
     print_pwd_and_ls()
-
+    '''
     winner = population.run(eval_gemones_multi, n)
     
     print('winner is ... ', winner)
