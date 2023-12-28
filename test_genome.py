@@ -211,8 +211,8 @@ def preprocess_data(simulation_vars):
         sin_df = sin_df.reset_index(drop=True)
         # Find the split index (70% of the total rows)
         split_index = int(0.7 * df.shape[0])
-        small_start = int(0.0025 * df.shape[0])
-        small_end = int(0.005 * df.shape[0])
+        small_start = int(0.01 * df.shape[0])
+        small_end = int(0.015 * df.shape[0])
         # Create neat_df as the first 70% of rows of data from df
         small_train_df = df.iloc[small_start:small_end]
         train_df = df.iloc[:split_index]
@@ -225,7 +225,7 @@ def preprocess_data(simulation_vars):
         small_train_df.to_pickle("data/small_train_df.pkl")
         pre_train_df.to_pickle("data/pre_train_df.pkl")
     # Load neat_df
-    neat_df = pd.read_pickle("data/train_df.pkl")
+    neat_df = pd.read_pickle("data/small_train_df.pkl")
     #print('neat_df.shape: ', neat_df.shape)
     return mypiplocation, neat_df
 

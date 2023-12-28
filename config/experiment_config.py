@@ -15,7 +15,7 @@ SECURE_HEADER = {
 
 spread = 1.5 # pips (for cost calc.)
 
-volume = 10
+volume = 50
 
 initial_balance = 1000
 

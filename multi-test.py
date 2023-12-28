@@ -74,6 +74,7 @@ def fetch_instrument_data(api_key, account_id, instrument_name):
         print(f"Error: {inst_response.status_code}, {inst_response.text}")
         return None
 
+
 from config.acct_config import *
 def get_and_pickle_instrument_info(API_KEY, ACCOUNT_ID, instrument):
     # Check if 'instruments.pkl' file exists
@@ -205,10 +206,12 @@ def preprocess_data(simulation_vars):
         sin_df = sin_df.reset_index(drop=True)
         # Find the split index (70% of the total rows)
         split_index = int(0.7 * df.shape[0])
-        small_split = int(0.0025 * df.shape[0])
-        small_next_split = int(0.0075 * df.shape[0])
+        #small_split = int(0.0025 * df.shape[0])
+        #small_next_split = int(0.0075 * df.shape[0])
+        small_start = int(0.005 * df.shape[0])
+        small_end = int(0.0075 * df.shape[0])
         # Create neat_df as the first 70% of rows of data from df
-        small_train_df = df.iloc[small_split:small_next_split]
+        small_train_df = df.iloc[small_start:small_end]
         train_df = df.iloc[:split_index]
         # Create neat_df as the first 70% of rows of data from df
         test_df = df.iloc[split_index:]
@@ -498,7 +501,7 @@ def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (n
         
         # if episode NOT done
         if not local_simulation_vars['done']:          
-            local_simulation_vars['current_timestamp'] = data.loc[local_simulation_vars['current_step'], 'time']
+            local_simulation_vars['current_timestamp'] = data['time'].iloc[local_simulation_vars['current_step']] #data.loc[local_simulation_vars['current_step'], 'time']
             #local_simulation_vars['current_step']
             #logging.info('current_step %s',local_simulation_vars['current_step'])
             local_simulation_vars['current_price'] = data['bid_c'].iloc[local_simulation_vars['current_step']]
