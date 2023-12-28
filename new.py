@@ -13,6 +13,7 @@
 # add live trading loop
 import os
 import re
+import glob
 import os.path
 import time
 from time import sleep
@@ -293,7 +294,7 @@ def set_start_method():
         multiprocessing.set_start_method('fork')
         print('non-windows detected - using fork multiprocessing method')
 
-def eval_gemones_multi(genomes, config):
+def eval_gemones_multi(genomes, config, simulation_vars):
     nets = []
     ge = []
     processes = []
@@ -732,6 +733,15 @@ def plot_neat_df(*col_names):
     plt.savefig(plot_file_name)
     plt.show()
 
+def get_df_pkl_lst():
+    # Define the pattern to match files with a number in the filename
+    pattern = 'data/df-[0-9]*.pkl'  # Will match files like 'data/df-123.pkl'
+    # Retrieve the list of files that match the pattern
+    files = glob.glob(pattern)
+     # Sort the files based on the number in the filename
+    files.sort(key=lambda x: int(re.search(r'df-(\d+)\.pkl', x).group(1)))
+    return files
+
 def render(self):
     # Implement rendering or visualization code if needed
     pass
@@ -795,7 +805,23 @@ def main():
     simulation_vars['mypiplocation'] = preprocess_data(simulation_vars)
     
     # train/test nested loop
-    list_of_dfs = get_df_pkl_lst()
+    sorted_list_of_dfs = get_df_pkl_lst()
+
+    if len(sorted_list_of_dfs) >= 2:
+        train_df_path = sorted_list_of_dfs[0]
+        test_df_path = sorted_list_of_dfs[1]
+
+        # Now you can use first_df and second_df as needed
+        # For example:
+        print("First DataFrame path:", first_df)
+        print("Second DataFrame path:", second_df)
+    else:
+        print("There are fewer than two dataframes available.")
+
+    for df_path in sorted_list_of_dfs:
+        # find latest saved genome, and build pop, else start training from scratch
+        train(df_path)
+        test(df_path)
 
     '''
     winner = population.run(eval_gemones_multi, n)
