@@ -32,4 +32,5 @@ COPY . /app
 # default Command to run the Python application without specifying parameter test
 #CMD ["python", "multi-test.py"]
 #CMD ["python", "test_genome.py"]
-CMD ["python", "new_main.py"]
+#CMD ["python", "new_main.py"]
+CMD ["python", "live_trading_loop.py"]
