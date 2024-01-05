@@ -251,7 +251,7 @@ def set_start_method():
         multiprocessing.set_start_method('fork')
         print('non-windows detected - using fork multiprocessing method')
 
-def eval_gemones_multi(genomes, config):
+def eval_genomes_multi(genomes, config):
     nets = []
     ge = []
     processes = []
@@ -310,7 +310,7 @@ def eval_gemones_multi(genomes, config):
                 else:
                     genome.fitness = 0.0
             
-# end eval_gemones_multi()
+# end eval_genomes_multi()
 
 # Code for evaluating a single genome
 def evaluate_genome(queue, data_tuple, local_simulation_vars): # input_tuple: (neat_df, network)
@@ -795,7 +795,7 @@ if __name__ == '__main__':
     # Call the function to print pwd and ls -la
     print_pwd_and_ls()
     '''
-    winner = population.run(eval_gemones_multi, n)
+    winner = population.run(eval_genomes_multi, n)
     
     print('winner is ... ', winner)
     best_genome_filename = pickle_best_genome(winner)
