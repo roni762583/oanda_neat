@@ -1,5 +1,13 @@
 # demo live trading loop
 
+# observation is incorrect, showing position when there is none:
+'''
+No open trades in the account.
+No open positions in the account.
+obs.  [-1.099999999999568 -0.12500000000000475 -0.0063 -1.0]
+'''
+
+
 #!pip install neat-python
 import pandas as pd
 import neat
