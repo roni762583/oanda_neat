@@ -286,4 +286,4 @@ def evaluate_genome_new(queue, data_tuple, local_simulation_vars): # input_tuple
         total_reward = 0.0
     
     return total_reward
-# end evaluate_genome()
+# end evaluate_genome_new()

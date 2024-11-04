@@ -10,7 +10,7 @@
 #    i+1 is used for testing winner of training i - record stats: PnL, expectancy, max dd, ..., graph test run w/ trades
 # end of daily df's
 # add web GUI - training monitoring, live rolling stats, graphs, control button
-from src import evaluate_genome_new as egn
+from src.evaluate_genome_new import * 
 import os
 import re
 import glob
