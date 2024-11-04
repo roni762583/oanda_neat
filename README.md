@@ -1,6 +1,6 @@
 # OANDA NEAT Trading Algorithm
 
-This repository contains a trading algorithm that leverages NeuroEvolution of Augmenting Topologies (NEAT) for decision-making in the forex market using the OANDA trading platform.
+This repository contains a trading algorithm that leverages **NeuroEvolution of Augmenting Topologies (NEAT)** for decision-making in the forex market using the OANDA trading platform.
 
 ## Overview
 
@@ -16,6 +16,7 @@ You can install the required packages using the following command:
 
 ```bash
 pip install -r requirements.txt
+
 
 Reward Function
 
@@ -42,68 +43,54 @@ Initial results from the trading algorithm can be found in the graphs and trades
     Graphs: Visual representations of the performance of various genome agents over time.
     Trade Lists: Logs of trades executed by the agents, detailing timestamps, trade directions, and profit/loss outcomes.
 
-Directory Structure
-
-arduino
-
-G:.
-│   Dockerfile
-│   main.py
-│   multi-test.py
-│   requirements.txt
-│   sine.py
-│   README.md
-│   docker-commands.txt
-│   print_love.bat
-│   test_genome.py
-│   original_main.py
-│   new_main.py
-│   live_trading_loop.py
-│   AUD_JPY_M1.pkl
-│
-├───checkpoints
-│       neat-checkpoint-0
-│       neat-checkpoint-1
-│       neat-checkpoint-2
-│       neat-checkpoint-3
-│       neat-checkpoint-4
-│       neat-checkpoint-5
-│       neat-checkpoint-6
-│
-├───config
-│   │   neat_config.txt
-│   │   experiment_config.py
-│   │   acct_config.py
-│   │
-│   └───__pycache__
-│           acct_config.cpython-310.pyc
-│           experiment_config.cpython-310.pyc
-│           acct_config.cpython-39.pyc
-│           experiment_config.cpython-39.pyc
-│
-├───data
-│       (Numerous .pkl files for training data)
-│
-├───models
-│       (Various model checkpoints)
-│
-├───src
-│       trading_environment.py
-│       neat_agent.py
-│       functions.py
-│       __init__.py
-│       xor.py
-│       visualize.py
-│       position.py
-│       config-feedforward
-│       evaluate_genome_new.py
-│
-├───trades
-│       (Trade lists recorded during simulations)
-│
-├───graphs
-│       (Graphical representations of agent performance)
-│
+Directory Structure:
+.
+├── Dockerfile
+├── main.py
+├── multi-test.py
+├── requirements.txt
+├── sine.py
+├── README.md
+├── docker-commands.txt
+├── print_love.bat
+├── test_genome.py
+├── original_main.py
+├── new_main.py
+├── live_trading_loop.py
+├── AUD_JPY_M1.pkl
+├── checkpoints
+│   ├── neat-checkpoint-0
+│   ├── neat-checkpoint-1
+│   ├── neat-checkpoint-2
+│   ├── neat-checkpoint-3
+│   ├── neat-checkpoint-4
+│   ├── neat-checkpoint-5
+│   └── neat-checkpoint-6
+├── config
+│   ├── neat_config.txt
+│   ├── experiment_config.py
+│   └── acct_config.py
+│   └── __pycache__
+│       ├── acct_config.cpython-310.pyc
+│       └── experiment_config.cpython-310.pyc
+├── data
+│   └── (Numerous .pkl files for training data)
+├── models
+│   └── (Various model checkpoints)
+├── src
+│   ├── trading_environment.py
+│   ├── neat_agent.py
+│   ├── functions.py
+│   ├── __init__.py
+│   ├── xor.py
+│   ├── visualize.py
+│   ├── position.py
+│   ├── config-feedforward
+│   └── evaluate_genome_new.py
+├── trades
+│   └── (Trade lists recorded during simulations)
+└── graphs
+    └── (Graphical representations of agent performance)
 
 Getting Started
 
